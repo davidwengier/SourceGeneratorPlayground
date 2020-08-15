@@ -1,0 +1,61 @@
+name: Master
+
+on:
+  push:
+    branches:
+    - master
+    paths-ignore:
+    - '*.md'
+    - '.github/**'
+
+jobs:
+  build:
+
+    runs-on: windows-latest
+
+    steps:
+    - name: 'Checkout GitHub Action'
+      uses: actions/checkout@v1
+      
+    - name: Setup .NET Core
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '3.1.x'
+
+    - name: Build
+      run: dotnet build
+
+    - name: publish
+      run: dotnet publish -o ./publish -r win-x64 -c Release --no-self-contained -p:PublishSingleFile=true SourceGeneratorPlayground.csproj
+
+    - name: GitVersion
+      id: nbgv
+      uses: aarnott/nbgv@master
+      with:
+        setAllVars: true
+
+    - run: |
+        echo 'SemVer2: ${{ steps.nbgv.outputs.SemVer2 }}'
+
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ steps.nbgv.outputs.SemVer2 }}
+        release_name: Source Generator Playground v${{ steps.nbgv.outputs.SemVer2 }}
+        body: Source Generator Playground v${{ steps.nbgv.outputs.SemVer2 }}
+        draft: false
+        prerelease: false
+        
+    - name: Upload Release Asset
+      id: upload-release-asset 
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./publish/SourceGeneratorPlayground.exe
+        asset_name: SourceGeneratorPlayground.exe
+        asset_content_type: application/exe
