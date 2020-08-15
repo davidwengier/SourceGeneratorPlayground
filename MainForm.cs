@@ -87,17 +87,18 @@ namespace SourceGeneratorPlayground
             return tabs;
         }
 
-        private static TextBox CreateTextBox(bool isReadOnly) => new TextBox()
-        {
-            Dock = DockStyle.Fill,
-            Font = new Font("Cascadia Code", 11),
-            Multiline = true,
-            AcceptsReturn = true,
-            AcceptsTab = true,
-            BackColor = SystemColors.Window,
-            ReadOnly = isReadOnly,
-            WordWrap = false,
-            ScrollBars = ScrollBars.Both
-        };
+        private static TextBox CreateTextBox(bool isReadOnly)
+            => new TextBox()
+            {
+                Dock = DockStyle.Fill,
+                Font = new Font("Cascadia Code", 11),
+                Multiline = true,
+                AcceptsReturn = true,
+                AcceptsTab = true,
+                BackColor = SystemColors.Window,
+                ReadOnly = isReadOnly,
+                WordWrap = false,
+                ScrollBars = ScrollBars.Both
+            };
     }
 }
