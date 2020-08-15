@@ -14,4 +14,4 @@ Issues and PRs welcome, but please remember this is a work in progress. Yes the 
 
 ### Note
 
-This application compiles and runs code on your machine, and no responsibility is taken if in doing so harm is caused.
+This application compiles and runs code on your machine, and no responsibility is taken if any harm is done to your computer in doing so.
