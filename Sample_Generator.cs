@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -21,12 +22,6 @@ namespace SourceGenerator
         {
             Compilation? compilation = context.Compilation;
 
-            string sourceBuilder = Generate(compilation);
-            context.AddSource("ServiceLocator.cs", SourceText.From(sourceBuilder, Encoding.UTF8));
-        }
-
-        public static string Generate(Compilation compilation)
-        {
             string stub = @"
 namespace DI
 { 
@@ -66,17 +61,19 @@ namespace DI
 
                 foreach (INamedTypeSymbol? typeToCreate in typesToCreate)
                 {
-                    Generate(typeToCreate, compilation, services, knownTypes);
+                    Generate(context, typeToCreate, compilation, services, knownTypes);
                 }
             }
 
             sourceBuilder.AppendLine(@"
+using System;
+
 namespace DI
 { 
     public static class ServiceLocator
     {");
             var fields = new List<Service>();
-            GenerateFields(sourceBuilder, services, fields);
+            GenerateFields(sourceBuilder, services, fields, services.Count > 1);
 
             sourceBuilder.AppendLine(@"
         public static T GetService<T>()
@@ -84,26 +81,35 @@ namespace DI
 
             foreach (Service? service in services)
             {
-                sourceBuilder.AppendLine("if (typeof(T) == typeof(" + service.Type + "))");
-                sourceBuilder.AppendLine("{");
-                sourceBuilder.AppendLine($"    return (T)(object){GetTypeConstruction(service, service.IsTransient ? new List<Service>() : fields)};");
-                sourceBuilder.AppendLine("}");
+                if (service != services.Last())
+                {
+                    sourceBuilder.AppendLine("if (typeof(T) == typeof(" + service.Type + "))");
+                    sourceBuilder.AppendLine("{");
+                }
+                sourceBuilder.AppendLine($"    return (T)(object){GetTypeConstruction(service, service.IsTransient ? new List<Service>() : fields, services.Count > 1)};");
+                if (service != services.Last())
+                {
+                    sourceBuilder.AppendLine("}");
+                }
             }
 
-            sourceBuilder.AppendLine("throw new System.InvalidOperationException(\"Don't know how to initialize type: \" + typeof(T).Name);");
+            if (services.Count == 0)
+            {
+                sourceBuilder.AppendLine("throw new System.InvalidOperationException(\"This code is unreachable.\");");
+            }
             sourceBuilder.AppendLine(@"
         }
     }
 }");
 
-            return sourceBuilder.ToString();
+            context.AddSource("ServiceLocator.cs", SourceText.From(sourceBuilder.ToString(), Encoding.UTF8));
         }
 
-        private static void GenerateFields(StringBuilder sourceBuilder, List<Service> services, List<Service> fields)
+        private static void GenerateFields(StringBuilder sourceBuilder, List<Service> services, List<Service> fields, bool lazy)
         {
             foreach (Service? service in services)
             {
-                GenerateFields(sourceBuilder, service.ConstructorArguments, fields);
+                GenerateFields(sourceBuilder, service.ConstructorArguments, fields, lazy);
                 if (!service.IsTransient)
                 {
                     if (fields.Any(f => SymbolEqualityComparer.Default.Equals(f.ImplementationType, service.ImplementationType)))
@@ -111,13 +117,23 @@ namespace DI
                         continue;
                     }
                     service.VariableName = GetVariableName(service, fields);
-                    sourceBuilder.AppendLine($"private static {service.Type} {service.VariableName} = {GetTypeConstruction(service, fields)};");
+                    sourceBuilder.Append($"private static ");
+                    if (lazy)
+                    {
+                        sourceBuilder.Append("Lazy<");
+                    }
+                    sourceBuilder.Append(service.Type);
+                    if (lazy)
+                    {
+                        sourceBuilder.Append(">");
+                    }
+                    sourceBuilder.AppendLine($" {service.VariableName} = {GetTypeConstruction(service, fields, lazy)};");
                     fields.Add(service);
                 }
             }
         }
 
-        private static string GetTypeConstruction(Service service, List<Service> fields)
+        private static string GetTypeConstruction(Service service, List<Service> fields, bool lazy)
         {
             var sb = new StringBuilder();
 
@@ -125,9 +141,19 @@ namespace DI
             if (field != null)
             {
                 sb.Append(field.VariableName);
+                if (lazy)
+                {
+                    sb.Append(".Value");
+                }
             }
             else
             {
+                if (lazy)
+                {
+                    sb.Append("new Lazy<");
+                    sb.Append(service.Type);
+                    sb.Append(">(() => ");
+                }
                 sb.Append("new ");
                 sb.Append(service.ImplementationType);
                 sb.Append('(');
@@ -143,7 +169,7 @@ namespace DI
                     {
                         sb.Append(',');
                     }
-                    sb.Append(GetTypeConstruction(arg, fields));
+                    sb.Append(GetTypeConstruction(arg, fields, lazy));
                     first = false;
                 }
                 if (service.UseCollectionInitializer)
@@ -153,6 +179,10 @@ namespace DI
                 else
                 {
                     sb.Append(')');
+                }
+                if (lazy)
+                {
+                    sb.Append(")");
                 }
             }
             return sb.ToString();
@@ -176,9 +206,14 @@ namespace DI
             return typeName;
         }
 
-        private static void Generate(INamedTypeSymbol typeToCreate, Compilation compilation, List<Service> services, KnownTypes knownTypes)
+        private static void Generate(SourceGeneratorContext context, INamedTypeSymbol typeToCreate, Compilation compilation, List<Service> services, KnownTypes knownTypes)
         {
             typeToCreate = (INamedTypeSymbol)typeToCreate.WithNullableAnnotation(default);
+
+            if (services.Any(s => SymbolEqualityComparer.Default.Equals(s.Type, typeToCreate)))
+            {
+                return;
+            }
 
             if (typeToCreate.IsGenericType && SymbolEqualityComparer.Default.Equals(typeToCreate.ConstructUnboundGenericType(), knownTypes.IEnumerableOfT))
             {
@@ -186,6 +221,7 @@ namespace DI
                 IEnumerable<INamedTypeSymbol>? types = FindImplementations(typeToFind, compilation);
 
                 INamedTypeSymbol? list = knownTypes.ListOfT.Construct(typeToFind);
+
                 var listService = new Service(typeToCreate);
                 services.Add(listService);
                 listService.ImplementationType = list;
@@ -193,28 +229,30 @@ namespace DI
 
                 foreach (INamedTypeSymbol? thingy in types)
                 {
-                    Generate(thingy, compilation, listService.ConstructorArguments, knownTypes);
+                    Generate(context, thingy, compilation, listService.ConstructorArguments, knownTypes);
                 }
             }
             else
             {
                 INamedTypeSymbol? realType = typeToCreate.IsAbstract ? FindImplementation(typeToCreate, compilation) : typeToCreate;
 
-                if (realType != null)
+                if (realType == null)
                 {
-                    var service = new Service(typeToCreate);
-                    services.Add(service);
-                    service.ImplementationType = realType;
+                    context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor("DIGEN001", "Type not found", $"Could not find an implementation of '{typeToCreate}'.", "DI.ServiceLocator", DiagnosticSeverity.Error, true), Location.None));
+                }
 
-                    IMethodSymbol? constructor = realType?.Constructors.FirstOrDefault();
-                    if (constructor != null)
+                var service = new Service(typeToCreate);
+                services.Add(service);
+                service.ImplementationType = realType;
+
+                IMethodSymbol? constructor = realType?.Constructors.FirstOrDefault();
+                if (constructor != null)
+                {
+                    foreach (IParameterSymbol? parametr in constructor.Parameters)
                     {
-                        foreach (IParameterSymbol? parametr in constructor.Parameters)
+                        if (parametr.Type is INamedTypeSymbol paramType)
                         {
-                            if (parametr.Type is INamedTypeSymbol paramType)
-                            {
-                                Generate(paramType, compilation, service.ConstructorArguments, knownTypes);
-                            }
+                            Generate(context, paramType, compilation, service.ConstructorArguments, knownTypes);
                         }
                     }
                 }
@@ -281,4 +319,3 @@ namespace DI
         }
     }
 }
-    

@@ -6,18 +6,35 @@ namespace MyApp
     {
         static void Main()
         {
-            var foo = DI.ServiceLocator.GetService<IFoo>();
-            Console.WriteLine(foo.Message());
+            // var foo = DI.ServiceLocator.GetService<IFoo>();
+
+            // var anotherFoo = DI.ServiceLocator.GetService<IFoo>();
+
+            // var bar = DI.ServiceLocator.GetService<IBar>();
+
+            // var baz = DI.ServiceLocator.GetService<IBaz>();
+
+            Console.WriteLine("Hello World");
         }
     }
 
     interface IFoo
     {
-        string Message();
     }
 
     class Foo : IFoo
     {
-        public string Message() => "Hello World";
+    }
+
+    interface IBar
+    {
+    }
+
+    class Bar : IBar
+    {
+    }
+
+    interface IBaz
+    {
     }
 }
