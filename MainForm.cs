@@ -11,7 +11,6 @@ namespace SourceGeneratorPlayground
 
         public MainForm()
         {
-            System.Console.BackgroundColor = ConsoleColor.White;
             this.StartPosition = FormStartPosition.WindowsDefaultBounds;
             this.Text = "Source Generator Playground - v" + ThisAssembly.AssemblyInformationalVersion;
 
@@ -59,7 +58,7 @@ namespace SourceGeneratorPlayground
                     loadMenu.DropDownItems.Add(name.Split(".")[2]).Click += LoadSample;
                 }
             }
-            loadMenu.DropDownItems[0].PerformClick();
+            loadMenu.DropDownItems[2].PerformClick();
             this.MainMenuStrip.Visible = true;
 
             void LoadSample(object? s, EventArgs e)

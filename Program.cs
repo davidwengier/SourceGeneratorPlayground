@@ -16,6 +16,10 @@ namespace SourceGeneratorPlayground
             Application.SetCompatibleTextRenderingDefault(false);
             using var mainForm = new MainForm();
             Application.Run(mainForm);
+
+            // TODO: Use https://github.com/jaredpar/roslyn-codedom
+            System.Console.BackgroundColor = ConsoleColor.White;
+            System.ComponentModel.INotifyPropertyChanged? c = null;
         }
     }
 }
