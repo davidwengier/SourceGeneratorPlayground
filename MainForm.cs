@@ -14,6 +14,7 @@ namespace SourceGeneratorPlayground
             System.Console.BackgroundColor = ConsoleColor.White;
             this.StartPosition = FormStartPosition.WindowsDefaultBounds;
             this.Text = "Source Generator Playground - v" + ThisAssembly.AssemblyInformationalVersion;
+
             var splitter = new SplitContainer()
             {
                 Dock = DockStyle.Fill,
@@ -47,10 +48,28 @@ namespace SourceGeneratorPlayground
             codeEditor.TextChanged += Generate;
             generator.TextChanged += Generate;
 
-            using var streamReader = new StreamReader(GetType().Assembly.GetManifestResourceStream(nameof(SourceGeneratorPlayground) + ".Sample_Program.cs")!);
-            codeEditor.Text = streamReader.ReadToEnd();
-            using var streamReader1 = new StreamReader(GetType().Assembly.GetManifestResourceStream(nameof(SourceGeneratorPlayground) + ".Sample_Generator.cs")!);
-            generator.Text = streamReader1.ReadToEnd();
+            this.MainMenuStrip = new MenuStrip();
+            this.MainMenuStrip.Dock = DockStyle.Top;
+            this.Controls.Add(this.MainMenuStrip);
+            var loadMenu = (ToolStripMenuItem)this.MainMenuStrip.Items.Add("Load");
+            foreach (var name in GetType().Assembly.GetManifestResourceNames())
+            {
+                if (name.StartsWith("SourceGeneratorPlayground.Samples") && name.EndsWith(".Generator.cs"))
+                {
+                    loadMenu.DropDownItems.Add(name.Split(".")[2]).Click += LoadSample;
+                }
+            }
+            loadMenu.DropDownItems[0].PerformClick();
+            this.MainMenuStrip.Visible = true;
+
+            void LoadSample(object? s, EventArgs e)
+            {
+                string name = ((ToolStripItem)s).Text;
+                using var streamReader = new StreamReader(GetType().Assembly.GetManifestResourceStream(nameof(SourceGeneratorPlayground) + ".Samples." + name + ".Program.cs")!);
+                codeEditor.Text = streamReader.ReadToEnd();
+                using var streamReader1 = new StreamReader(GetType().Assembly.GetManifestResourceStream(nameof(SourceGeneratorPlayground) + ".Samples." + name + ".Generator.cs")!);
+                generator.Text = streamReader1.ReadToEnd();
+            }
 
             void Generate(object? s, EventArgs e)
             {

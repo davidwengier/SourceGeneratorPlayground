@@ -9,10 +9,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="Sample_Generator.cs" />
-    <Compile Remove="Sample_Program.cs" />
-    <EmbeddedResource Include="Sample_Generator.cs" />
-    <EmbeddedResource Include="Sample_Program.cs" />
+    <Compile Remove="Samples\*.cs" />
+    <EmbeddedResource Include="Samples\*.cs" />
   </ItemGroup>
 
   <ItemGroup>
