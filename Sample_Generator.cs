@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Linq;
-using System.Reflection;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -14,15 +12,7 @@ namespace SourceGenerator
     [Generator]
     public class DISourceGenerator : ISourceGenerator
     {
-        public void Initialize(InitializationContext context)
-        {
-        }
-
-        public void Execute(SourceGeneratorContext context)
-        {
-            Compilation? compilation = context.Compilation;
-
-            string stub = @"
+        private const string ServiceLocatorStub = @"
 namespace DI
 { 
     public static class ServiceLocator
@@ -34,22 +24,37 @@ namespace DI
     }
 }
 ";
+        private const string TransientAttribute = @"
+using System;
 
-            var options = (compilation as CSharpCompilation)?.SyntaxTrees[0].Options as CSharpParseOptions;
-            compilation = compilation.AddSyntaxTrees(CSharpSyntaxTree.ParseText(SourceText.From(stub, Encoding.UTF8), options));
+namespace DI
+{
+    [AttributeUsage(AttributeTargets.Interface)]
+    public class TransientAttribute : Attribute
+    {
+    }
+}
+";
 
-            ImmutableArray<Diagnostic> diags = compilation.GetDiagnostics();
+        public void Initialize(InitializationContext context)
+        {
+        }
 
-            var sourceBuilder = new StringBuilder();
+        public void Execute(SourceGeneratorContext context)
+        {
+            Compilation? compilation = context.Compilation;
 
-            var services = new List<Service>();
+            compilation = GenerateHelperClasses(context);
 
             INamedTypeSymbol? serviceLocatorClass = compilation.GetTypeByMetadataName("DI.ServiceLocator")!;
+            INamedTypeSymbol? transientAttribute = compilation.GetTypeByMetadataName("DI.TransientAttribute")!;
+
             INamedTypeSymbol? iEnumerableOfT = compilation.GetTypeByMetadataName("System.Collections.Generic.IEnumerable`1")!.ConstructUnboundGenericType();
             INamedTypeSymbol? listOfT = compilation.GetTypeByMetadataName("System.Collections.Generic.List`1")!;
 
-            var knownTypes = new KnownTypes(iEnumerableOfT, listOfT);
+            var knownTypes = new KnownTypes(iEnumerableOfT, listOfT, transientAttribute);
 
+            var services = new List<Service>();
             foreach (SyntaxTree? tree in compilation.SyntaxTrees)
             {
                 SemanticModel? semanticModel = compilation.GetSemanticModel(tree);
@@ -61,9 +66,29 @@ namespace DI
 
                 foreach (INamedTypeSymbol? typeToCreate in typesToCreate)
                 {
-                    Generate(context, typeToCreate, compilation, services, knownTypes);
+                    CollectServices(context, typeToCreate, compilation, services, knownTypes);
                 }
             }
+
+            GenerateServiceLocator(context, services);
+        }
+
+        private static Compilation GenerateHelperClasses(SourceGeneratorContext context)
+        {
+            var compilation = context.Compilation;
+
+            var options = (compilation as CSharpCompilation)?.SyntaxTrees[0].Options as CSharpParseOptions;
+            var tempCompilation = compilation.AddSyntaxTrees(CSharpSyntaxTree.ParseText(SourceText.From(ServiceLocatorStub, Encoding.UTF8), options))
+                                             .AddSyntaxTrees(CSharpSyntaxTree.ParseText(SourceText.From(TransientAttribute, Encoding.UTF8), options));
+
+            context.AddSource("TransientAttribute.cs", SourceText.From(TransientAttribute, Encoding.UTF8));
+
+            return tempCompilation;
+        }
+
+        private static void GenerateServiceLocator(SourceGeneratorContext context, List<Service> services)
+        {
+            var sourceBuilder = new StringBuilder();
 
             sourceBuilder.AppendLine(@"
 using System;
@@ -86,7 +111,7 @@ namespace DI
                     sourceBuilder.AppendLine("if (typeof(T) == typeof(" + service.Type + "))");
                     sourceBuilder.AppendLine("{");
                 }
-                sourceBuilder.AppendLine($"    return (T)(object){GetTypeConstruction(service, service.IsTransient ? new List<Service>() : fields, services.Count > 1)};");
+                sourceBuilder.AppendLine($"    return (T)(object){GetTypeConstruction(service, service.IsTransient ? new List<Service>() : fields, !service.IsTransient && services.Count > 1)};");
                 if (service != services.Last())
                 {
                     sourceBuilder.AppendLine("}");
@@ -206,7 +231,7 @@ namespace DI
             return typeName;
         }
 
-        private static void Generate(SourceGeneratorContext context, INamedTypeSymbol typeToCreate, Compilation compilation, List<Service> services, KnownTypes knownTypes)
+        private static void CollectServices(SourceGeneratorContext context, INamedTypeSymbol typeToCreate, Compilation compilation, List<Service> services, KnownTypes knownTypes)
         {
             typeToCreate = (INamedTypeSymbol)typeToCreate.WithNullableAnnotation(default);
 
@@ -229,7 +254,7 @@ namespace DI
 
                 foreach (INamedTypeSymbol? thingy in types)
                 {
-                    Generate(context, thingy, compilation, listService.ConstructorArguments, knownTypes);
+                    CollectServices(context, thingy, compilation, listService.ConstructorArguments, knownTypes);
                 }
             }
             else
@@ -239,11 +264,13 @@ namespace DI
                 if (realType == null)
                 {
                     context.ReportDiagnostic(Diagnostic.Create(new DiagnosticDescriptor("DIGEN001", "Type not found", $"Could not find an implementation of '{typeToCreate}'.", "DI.ServiceLocator", DiagnosticSeverity.Error, true), Location.None));
+                    return;
                 }
 
                 var service = new Service(typeToCreate);
                 services.Add(service);
                 service.ImplementationType = realType;
+                service.IsTransient = typeToCreate.GetAttributes().Any(c => SymbolEqualityComparer.Default.Equals(c.AttributeClass, knownTypes.TransientAttribute));
 
                 IMethodSymbol? constructor = realType?.Constructors.FirstOrDefault();
                 if (constructor != null)
@@ -252,7 +279,7 @@ namespace DI
                     {
                         if (parametr.Type is INamedTypeSymbol paramType)
                         {
-                            Generate(context, paramType, compilation, service.ConstructorArguments, knownTypes);
+                            CollectServices(context, paramType, compilation, service.ConstructorArguments, knownTypes);
                         }
                     }
                 }
@@ -295,11 +322,13 @@ namespace DI
         {
             public INamedTypeSymbol IEnumerableOfT;
             public INamedTypeSymbol ListOfT;
+            public INamedTypeSymbol TransientAttribute;
 
-            public KnownTypes(INamedTypeSymbol iEnumerableOfT, INamedTypeSymbol listOfT)
+            public KnownTypes(INamedTypeSymbol iEnumerableOfT, INamedTypeSymbol listOfT, INamedTypeSymbol transientAttribute)
             {
                 IEnumerableOfT = iEnumerableOfT;
                 ListOfT = listOfT;
+                TransientAttribute = transientAttribute;
             }
         }
 
