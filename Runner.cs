@@ -223,7 +223,7 @@ namespace SourceGeneratorPlayground
                 return null;
             }
 
-            return header + Environment.NewLine + Environment.NewLine + string.Join("\n", errors);
+            return header + Environment.NewLine + Environment.NewLine + string.Join(Environment.NewLine, errors);
         }
 
         private static List<MetadataReference> GetReferences()
