@@ -110,7 +110,7 @@ namespace SourceGeneratorPlayground
                     output.AppendLine(new string('-', 50));
                 }
 
-                output.AppendLine(tree.ToString());
+                output.AppendLine(tree.WithRootAndOptions(tree.GetRoot().NormalizeWhitespace(), tree.Options).ToString());
             }
             if (output.Length == 0)
             {
