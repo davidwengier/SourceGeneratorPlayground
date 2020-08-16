@@ -96,7 +96,7 @@ namespace SourceGeneratorPlayground
             }
 
             var output = new StringBuilder();
-            SyntaxTree[]? trees = outputCompilation.SyntaxTrees.Where(t => t != codeTree).ToArray();
+            SyntaxTree[]? trees = outputCompilation.SyntaxTrees.Where(t => t != codeTree).OrderBy(t => t.FilePath).ToArray();
             foreach (SyntaxTree? tree in trees)
             {
                 if (output.Length > 0)
