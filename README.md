@@ -9,3 +9,5 @@ Source Generator PLayground is a simple Windows app that lets you experiment wit
 Multiple generators can be supplied, though they all need to live in the same text box, and the generator(s) can add any number of syntax trees to the compilation. All care is taken to capture meaningful errors from compilation of the generator, the program, and the running of the program.
 
 ![](assets/sourcegendev.gif)
+
+
