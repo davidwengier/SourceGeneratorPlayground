@@ -86,9 +86,14 @@ app {
         font-weight: bold;
     }
 
+        .banner .title .version {
+            font-size: 10pt;
+        }
+
     .banner .about {
         float: right;
     }
+
 
 .parent {
     display: grid;

@@ -4,7 +4,7 @@
 @using System.Threading
 
 <div class="banner">
-    <span class="title">Source Generator Playground</span>
+    <span class="title">Source Generator Playground<span class="version"> - @ThisAssembly.AssemblyInformationalVersion</span></span>
     Load sample: <select value="@_currentSample" @onchange="LoadSample">
         @{
             var index = 0;
