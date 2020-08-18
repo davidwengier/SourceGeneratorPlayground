@@ -4,7 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace SourceGeneratorPlayground.Blazor
+namespace SourceGeneratorPlayground
 {
     public static class SamplesLoader
     {
@@ -15,7 +15,7 @@ namespace SourceGeneratorPlayground.Blazor
             yield return " - None - ";
             foreach (var name in typeof(SamplesLoader).Assembly.GetManifestResourceNames())
             {
-                if (name.StartsWith("SourceGeneratorPlayground.Blazor.Samples") && name.EndsWith(".Generator.cs"))
+                if (name.StartsWith("SourceGeneratorPlayground.Samples") && name.EndsWith(".Generator.cs"))
                 {
                     yield return name.Split(".")[3];
                 }
@@ -25,8 +25,8 @@ namespace SourceGeneratorPlayground.Blazor
         public static (string, string) LoadSample(int index)
         {
             string name = Samples[index];
-            using var streamReader = new StreamReader(typeof(SamplesLoader).Assembly.GetManifestResourceStream("SourceGeneratorPlayground.Blazor.Samples." + name + ".Program.cs")!);
-            using var streamReader1 = new StreamReader(typeof(SamplesLoader).Assembly.GetManifestResourceStream("SourceGeneratorPlayground.Blazor.Samples." + name + ".Generator.cs")!);
+            using var streamReader = new StreamReader(typeof(SamplesLoader).Assembly.GetManifestResourceStream("SourceGeneratorPlayground.Samples." + name + ".Program.cs")!);
+            using var streamReader1 = new StreamReader(typeof(SamplesLoader).Assembly.GetManifestResourceStream("SourceGeneratorPlayground.Samples." + name + ".Generator.cs")!);
 
             return (streamReader.ReadToEnd(), streamReader1.ReadToEnd());
         }
