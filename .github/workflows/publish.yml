@@ -14,7 +14,13 @@ jobs:
     - uses: actions/checkout@v2
       with:
         fetch-depth: 0 # avoid shallow clone so nbgv can do its work.
-        
+
+              
+    - name: Setup .NET Core
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: 3.1.102
+
     - name: Publish app
       run: dotnet publish -c Release
       # You can use cd before if your project is in a subfolder
