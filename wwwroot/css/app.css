@@ -66,6 +66,26 @@ app {
     font-size: 16pt;
 }
 
+div.refresh {
+    position: relative;
+    width: 160px;
+    float: right;
+    vertical-align: bottom;
+}
+
+div.refresh span {
+    vertical-align: bottom;
+}
+
+div.refresh div {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 100px;
+    cursor: pointer;
+    line-height: 1;
+}
+
 .banner                  { 
     /* grid-area: 1 / 1 / 2 / 3; */
     background-color: white;

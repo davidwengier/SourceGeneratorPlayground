@@ -27,7 +27,16 @@
     <div class="generator"><MonacoEditor @ref="generator" Id="generator" ConstructionOptions="EditorConstructionOptions" OnKeyUp="OnKeyUp" /></div>
     <div class="program-output-header"><span class="header">Output</span></div>
     <div class="program-output"><MonacoEditor @ref="programOutput" Id="program-output" ConstructionOptions="EditorConstructionOptions" /></div>
-    <div class="generator-output-header"><span class="header">Generated Output</span></div>
+    <div class="generator-output-header"><span class="header">Generated Output</span>
+        <div class="refresh">
+            <span>
+                <input type="checkbox" @bind="_autoRefresh" /> Auto
+            </span>
+            <div class="btn btn-primary" @onclick="Refresh">
+                <span>Refresh</span>
+            </div>
+        </div>
+    </div>
     <div class="geneator-output"><MonacoEditor @ref="generatorOutput" Id="generator-output" ConstructionOptions="EditorConstructionOptions" /></div>
 </div>
 
@@ -37,6 +46,7 @@
     private MonacoEditor programOutput;
     private MonacoEditor generatorOutput;
     private int _currentSample = 3;
+    private bool _autoRefresh = true;
 
     protected async Task LoadSample(ChangeEventArgs e)
     {
@@ -86,24 +96,35 @@
         else if (editor == generator)
         {
             options.Value = gen;
-        }
 
         _ = Update(default);
+        }
+
 
         return options;
     }
 
     private CancellationTokenSource _typingCancellationSource = new CancellationTokenSource();
 
+    private void Refresh()
+    {
+        _ = Update(default);
+    }
+
     private void OnKeyUp(KeyboardEvent keyboardEvent)
     {
         // ignore arrow keys
-        if (keyboardEvent.KeyCode == KeyCode.LeftArrow || 
-            keyboardEvent.KeyCode == KeyCode.RightArrow || 
-            keyboardEvent.KeyCode == KeyCode.UpArrow || 
-            keyboardEvent.KeyCode == KeyCode.DownArrow || 
-            keyboardEvent.KeyCode == KeyCode.PageUp || 
-            keyboardEvent.KeyCode == KeyCode.PageDown )
+        if (keyboardEvent.KeyCode == KeyCode.LeftArrow ||
+            keyboardEvent.KeyCode == KeyCode.RightArrow ||
+            keyboardEvent.KeyCode == KeyCode.UpArrow ||
+            keyboardEvent.KeyCode == KeyCode.DownArrow ||
+            keyboardEvent.KeyCode == KeyCode.PageUp ||
+            keyboardEvent.KeyCode == KeyCode.PageDown)
+        {
+            return;
+        }
+
+        if (!_autoRefresh)
         {
             return;
         }
