@@ -12,7 +12,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-
+      with:
+        fetch-depth: 0 # avoid shallow clone so nbgv can do its work.
+        
     - name: Publish app
       run: dotnet publish -c Release
       # You can use cd before if your project is in a subfolder
