@@ -5,19 +5,18 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Reflection;
-using System.Runtime.Loader;
 using System.Text;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 
+#nullable enable
+
 namespace SourceGeneratorPlayground
 {
-    internal class Runner : IDisposable
+    internal class Runner
     {
-        private static List<MetadataReference> s_references;
+        private static List<MetadataReference>? s_references;
 
         private readonly string _code;
         private readonly string _generator;
@@ -147,7 +146,6 @@ namespace SourceGeneratorPlayground
             ExecuteProgram(programAssembly);
         }
 
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "<Pending>")]
         private void ExecuteProgram(Assembly programAssembly)
         {
             Type? program = programAssembly.GetTypes().FirstOrDefault(t => t.Name == "Program");
@@ -198,7 +196,6 @@ namespace SourceGeneratorPlayground
             }
         }
 
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "<Pending>")]
         private Assembly? GetAssembly(Compilation generatorCompilation, string name, out string? errors)
         {
             try
@@ -212,7 +209,7 @@ namespace SourceGeneratorPlayground
                 }
                 generatorStream.Seek(0, SeekOrigin.Begin);
                 errors = null;
-                return AssemblyLoadContext.Default.LoadFromStream(generatorStream);
+                return Assembly.Load(generatorStream.ToArray());
             }
             catch (Exception ex)
             {
@@ -235,7 +232,7 @@ namespace SourceGeneratorPlayground
 
         private static async Task<List<MetadataReference>> GetReferences(string baseUri)
         {
-            var refs = AppDomain.CurrentDomain.GetAssemblies();
+            Assembly[]? refs = AppDomain.CurrentDomain.GetAssemblies();
             var client = new HttpClient
             {
                 BaseAddress = new Uri(baseUri)
@@ -243,18 +240,14 @@ namespace SourceGeneratorPlayground
 
             var references = new List<MetadataReference>();
 
-            foreach (var reference in refs.Where(x => !x.IsDynamic && !string.IsNullOrWhiteSpace(x.Location)))
+            foreach (Assembly? reference in refs.Where(x => !x.IsDynamic && !string.IsNullOrWhiteSpace(x.Location)))
             {
-                var stream = await client.GetStreamAsync($"_framework/_bin/{reference.Location}");
+                Stream? stream = await client.GetStreamAsync($"_framework/_bin/{reference.Location}");
                 references.Add(MetadataReference.CreateFromStream(stream));
 
             }
 
             return references;
-        }
-
-        public void Dispose()
-        {
         }
     }
 }

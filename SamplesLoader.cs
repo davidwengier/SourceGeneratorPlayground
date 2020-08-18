@@ -1,8 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Threading.Tasks;
 
 namespace SourceGeneratorPlayground
 {
@@ -13,11 +11,11 @@ namespace SourceGeneratorPlayground
         private static IEnumerable<string> GetSamples()
         {
             yield return " - None - ";
-            foreach (var name in typeof(SamplesLoader).Assembly.GetManifestResourceNames())
+            foreach (string name in typeof(SamplesLoader).Assembly.GetManifestResourceNames())
             {
                 if (name.StartsWith("SourceGeneratorPlayground.Samples") && name.EndsWith(".Generator.cs"))
                 {
-                    yield return name.Split(".")[3];
+                    yield return name.Split(".")[2];
                 }
             }
         }

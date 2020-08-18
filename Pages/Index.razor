@@ -25,9 +25,9 @@
     <div class="code"><MonacoEditor @ref="codeEditor" Id="code-editor" ConstructionOptions="EditorConstructionOptions" OnKeyUp="OnKeyUp" /></div>
     <div class="generator-header"><span class="header">Source Generator</span><div class="fileUpload btn btn-primary"><span>Load</span><InputFile OnChange="HandleGeneratorFileSelected" /></div></div>
     <div class="generator"><MonacoEditor @ref="generator" Id="generator" ConstructionOptions="EditorConstructionOptions" OnKeyUp="OnKeyUp" /></div>
-    <div class="program-output-header"><span class="header">Program Output</span></div>
+    <div class="program-output-header"><span class="header">Output</span></div>
     <div class="program-output"><MonacoEditor @ref="programOutput" Id="program-output" ConstructionOptions="EditorConstructionOptions" /></div>
-    <div class="generator-output-header"><span class="header">Generator Output</span></div>
+    <div class="generator-output-header"><span class="header">Generated Output</span></div>
     <div class="geneator-output"><MonacoEditor @ref="generatorOutput" Id="generator-output" ConstructionOptions="EditorConstructionOptions" /></div>
 </div>
 
@@ -54,7 +54,7 @@
             await generator.SetValue(gen);
         }
 
-        OnKeyUp(null);
+        _ = Update(default);
     }
 
     private StandaloneEditorConstructionOptions EditorConstructionOptions(MonacoEditor editor)
@@ -88,7 +88,7 @@
             options.Value = gen;
         }
 
-        OnKeyUp(null);
+        _ = Update(default);
 
         return options;
     }
@@ -97,6 +97,17 @@
 
     private void OnKeyUp(KeyboardEvent keyboardEvent)
     {
+        // ignore arrow keys
+        if (keyboardEvent.KeyCode == KeyCode.LeftArrow || 
+            keyboardEvent.KeyCode == KeyCode.RightArrow || 
+            keyboardEvent.KeyCode == KeyCode.UpArrow || 
+            keyboardEvent.KeyCode == KeyCode.DownArrow || 
+            keyboardEvent.KeyCode == KeyCode.PageUp || 
+            keyboardEvent.KeyCode == KeyCode.PageDown )
+        {
+            return;
+        }
+
         _typingCancellationSource.Cancel();
         _typingCancellationSource = new CancellationTokenSource();
         _ = Update(_typingCancellationSource.Token);
@@ -111,7 +122,7 @@
             return;
         }
 
-        using var runner = new Runner(await codeEditor.GetValue(), await generator.GetValue());
+        var runner = new Runner(await codeEditor.GetValue(), await generator.GetValue());
 
         await runner.Run(navigationManager.BaseUri);
 
