@@ -21,9 +21,9 @@
 </div>
 
 <div class="parent">
-    <div class="code-header"><span class="header">Program Code</span><div class="fileUpload btn btn-primary"><span>Load</span><InputFile OnChange="HandleCodeFileSelected" /></div></div>
+    <div class="code-header"><span class="header">Program Code</span><div class="fileUpload btn btn-secondary"><span>Load</span><InputFile OnChange="HandleCodeFileSelected" /></div></div>
     <div class="code"><MonacoEditor @ref="codeEditor" Id="code-editor" ConstructionOptions="EditorConstructionOptions" OnKeyUp="OnKeyUp" /></div>
-    <div class="generator-header"><span class="header">Source Generator</span><div class="fileUpload btn btn-primary"><span>Load</span><InputFile OnChange="HandleGeneratorFileSelected" /></div></div>
+    <div class="generator-header"><span class="header">Source Generator</span><div class="fileUpload btn btn-secondary"><span>Load</span><InputFile OnChange="HandleGeneratorFileSelected" /></div></div>
     <div class="generator"><MonacoEditor @ref="generator" Id="generator" ConstructionOptions="EditorConstructionOptions" OnKeyUp="OnKeyUp" /></div>
     <div class="program-output-header"><span class="header">Output</span></div>
     <div class="program-output"><MonacoEditor @ref="programOutput" Id="program-output" ConstructionOptions="EditorConstructionOptions" /></div>

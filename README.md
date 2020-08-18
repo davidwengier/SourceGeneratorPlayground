@@ -1,4 +1,4 @@
-# Source Generator Playground
+# !["bulb by Luca Ska from the Noun Project"](assets/bulb.png) sourcegen.dev - The Source Generator Playground
 
 [![License: MIT](https://img.shields.io/github/license/davidwengier/SourceGeneratorPlayground?color=blue "License: MIT")](https://choosealicense.com/licenses/mit/)
 [![Master build status](https://github.com/davidwengier/SourceGeneratorPlayground/workflows/Master/badge.svg "Master build status")](https://github.com/davidwengier/SourceGeneratorPlayground/actions?query=workflow%3AMaster)
@@ -8,10 +8,4 @@ Source Generator PLayground is a simple Windows app that lets you experiment wit
 
 Multiple generators can be supplied, though they all need to live in the same text box, and the generator(s) can add any number of syntax trees to the compilation. All care is taken to capture meaningful errors from compilation of the generator, the program, and the running of the program.
 
-Issues and PRs welcome, but please remember this is a work in progress. Yes the editor is not good, and yes this would be more useful as a website. I'll get there :)
-
-![](assets/SourceGeneratorPlayground.gif)
-
-### Note
-
-This application compiles and runs code on your machine, and no responsibility is taken if any harm is done to your computer in doing so.
+![](assets/sourcegendev.gif)
