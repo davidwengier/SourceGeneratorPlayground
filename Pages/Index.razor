@@ -1,0 +1,147 @@
+﻿@page "/"
+@inject NavigationManager navigationManager
+@using BlazorInputFile
+@using System.Threading
+
+<div class="banner">
+    <span class="title">Source Generator Playground</span>
+    Load sample: <select value="@_currentSample" @onchange="LoadSample">
+        @{
+            var index = 0;
+        }
+        @foreach (string sample in SamplesLoader.Samples)
+        {
+            <option value="@(index++)">@sample</option>
+        }
+    </select>
+    <span class="about">
+        by <a target="_blank" href="https://twitter.com/davidwengier">@@davidwengier</a>
+        - <a target="_blank" href="https://github.com/davidwengier/SourceGeneratorPlayground">GitHub</a>
+    </span>
+</div>
+
+<div class="parent">
+    <div class="code-header"><span class="header">Program Code</span><div class="fileUpload btn btn-primary"><span>Load</span><InputFile OnChange="HandleCodeFileSelected" /></div></div>
+    <div class="code"><MonacoEditor @ref="codeEditor" Id="code-editor" ConstructionOptions="EditorConstructionOptions" OnKeyUp="OnKeyUp" /></div>
+    <div class="generator-header"><span class="header">Source Generator</span><div class="fileUpload btn btn-primary"><span>Load</span><InputFile OnChange="HandleGeneratorFileSelected" /></div></div>
+    <div class="generator"><MonacoEditor @ref="generator" Id="generator" ConstructionOptions="EditorConstructionOptions" OnKeyUp="OnKeyUp" /></div>
+    <div class="program-output-header"><span class="header">Program Output</span></div>
+    <div class="program-output"><MonacoEditor @ref="programOutput" Id="program-output" ConstructionOptions="EditorConstructionOptions" /></div>
+    <div class="generator-output-header"><span class="header">Generator Output</span></div>
+    <div class="geneator-output"><MonacoEditor @ref="generatorOutput" Id="generator-output" ConstructionOptions="EditorConstructionOptions" /></div>
+</div>
+
+@code {
+    private MonacoEditor codeEditor;
+    private MonacoEditor generator;
+    private MonacoEditor programOutput;
+    private MonacoEditor generatorOutput;
+    private int _currentSample = 3;
+
+    protected async Task LoadSample(ChangeEventArgs e)
+    {
+        _currentSample = Convert.ToInt32(e.Value);
+        if (_currentSample == 0)
+        {
+            await codeEditor.SetValue("");
+            await generator.SetValue("");
+        }
+        else
+        {
+            var (code, gen) = SamplesLoader.LoadSample(_currentSample);
+
+            await codeEditor.SetValue(code);
+            await generator.SetValue(gen);
+        }
+
+        OnKeyUp(null);
+    }
+
+    private StandaloneEditorConstructionOptions EditorConstructionOptions(MonacoEditor editor)
+    {
+        var options = new StandaloneEditorConstructionOptions
+        {
+            AutomaticLayout = true,
+            Language = "csharp",
+            Minimap = new MinimapOptions() { Enabled = false },
+            Folding = false,
+        };
+
+        if (editor == programOutput || editor == generatorOutput)
+        {
+            options.ReadOnly = true;
+        }
+        if (editor == programOutput)
+        {
+            options.Language = "txt";
+            options.LineNumbers = "";
+        }
+
+        var (code, gen) = SamplesLoader.LoadSample(_currentSample);
+
+        if (editor == codeEditor)
+        {
+            options.Value = code;
+        }
+        else if (editor == generator)
+        {
+            options.Value = gen;
+        }
+
+        OnKeyUp(null);
+
+        return options;
+    }
+
+    private CancellationTokenSource _typingCancellationSource = new CancellationTokenSource();
+
+    private void OnKeyUp(KeyboardEvent keyboardEvent)
+    {
+        _typingCancellationSource.Cancel();
+        _typingCancellationSource = new CancellationTokenSource();
+        _ = Update(_typingCancellationSource.Token);
+    }
+
+    private async Task Update(CancellationToken cancellationToken)
+    {
+        await Task.Delay(500, cancellationToken);
+
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return;
+        }
+
+        using var runner = new Runner(await codeEditor.GetValue(), await generator.GetValue());
+
+        await runner.Run(navigationManager.BaseUri);
+
+        if (runner.ErrorText?.Length != 0)
+        {
+            await programOutput.SetValue(runner.ErrorText);
+        }
+        else
+        {
+            await programOutput.SetValue(runner.ProgramOutput);
+        }
+        await generatorOutput.SetValue(runner.GeneratorOutput);
+    }
+
+    private async Task HandleCodeFileSelected(IFileListEntry[] files)
+    {
+        await LoadFile(files[0], codeEditor);
+    }
+
+    private async Task HandleGeneratorFileSelected(IFileListEntry[] files)
+    {
+        await LoadFile(files[0], generator);
+    }
+
+    private async Task LoadFile(IFileListEntry file, MonacoEditor editor)
+    {
+        using (var reader = new System.IO.StreamReader(file.Data))
+        {
+            await editor.SetValue(await reader.ReadToEndAsync());
+        }
+        _currentSample = 0;
+    }
+}
