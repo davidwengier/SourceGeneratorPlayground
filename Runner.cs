@@ -67,7 +67,7 @@ namespace SourceGeneratorPlayground
             }
             if (generatorAssembly == null)
             {
-                this.ErrorText = "Unknown error emiting generator.";
+                this.ErrorText = "Unknown error emitting generator.";
                 return;
             }
 
@@ -139,7 +139,7 @@ namespace SourceGeneratorPlayground
             }
             if (programAssembly == null)
             {
-                this.ErrorText = "Unknown error emiting program.";
+                this.ErrorText = "Unknown error emitting program.";
                 return;
             }
 
@@ -204,7 +204,7 @@ namespace SourceGeneratorPlayground
                 Microsoft.CodeAnalysis.Emit.EmitResult? result = generatorCompilation.Emit(generatorStream);
                 if (!result.Success)
                 {
-                    errors = GetErrors($"Error emiting {name}:", result.Diagnostics, false);
+                    errors = GetErrors($"Error emitting {name}:", result.Diagnostics, false);
                     return null;
                 }
                 generatorStream.Seek(0, SeekOrigin.Begin);
