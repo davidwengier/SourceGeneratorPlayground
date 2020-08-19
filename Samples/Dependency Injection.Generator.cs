@@ -12,6 +12,9 @@ namespace SourceGenerator
     [Generator]
     public class DISourceGenerator : ISourceGenerator
     {
+        private const bool SimplifyFieldNames = true;
+        private const bool UseLazyWhenMultipleServices = true;
+
         private const string ServiceLocatorStub = @"
 namespace DI
 { 
@@ -90,6 +93,8 @@ namespace DI
         {
             var sourceBuilder = new StringBuilder();
 
+            bool generateLazies = UseLazyWhenMultipleServices && services.Count > 1;
+
             sourceBuilder.AppendLine(@"
 using System;
 
@@ -98,7 +103,7 @@ namespace DI
     public static class ServiceLocator
     {");
             var fields = new List<Service>();
-            GenerateFields(sourceBuilder, services, fields, services.Count > 1);
+            GenerateFields(sourceBuilder, services, fields, generateLazies);
 
             sourceBuilder.AppendLine(@"
         public static T GetService<T>()
@@ -111,7 +116,7 @@ namespace DI
                     sourceBuilder.AppendLine("if (typeof(T) == typeof(" + service.Type + "))");
                     sourceBuilder.AppendLine("{");
                 }
-                sourceBuilder.AppendLine($"    return (T)(object){GetTypeConstruction(service, service.IsTransient ? new List<Service>() : fields, !service.IsTransient && services.Count > 1)};");
+                sourceBuilder.AppendLine($"    return (T)(object){GetTypeConstruction(service, service.IsTransient ? new List<Service>() : fields, !service.IsTransient && generateLazies)};");
                 if (service != services.Last())
                 {
                     sourceBuilder.AppendLine("}");
@@ -225,7 +230,10 @@ namespace DI
                 if (!fields.Any(f => string.Equals(f.VariableName, candidate, StringComparison.Ordinal)))
                 {
                     typeName = candidate;
-                    break;
+                    if (SimplifyFieldNames)
+                    {
+                        break;
+                    }
                 }
             }
             return typeName;
