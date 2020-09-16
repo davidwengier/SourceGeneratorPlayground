@@ -87,12 +87,9 @@ namespace SourceGeneratorPlayground
             SyntaxTree? codeTree = CSharpSyntaxTree.ParseText(_code, new CSharpParseOptions(kind: SourceCodeKind.Regular), "Program.cs");
             var codeCompilation = CSharpCompilation.Create("Program", new SyntaxTree[] { codeTree }, s_references, new CSharpCompilationOptions(OutputKind.ConsoleApplication));
 
-            var driver = new CSharpGeneratorDriver(codeCompilation.SyntaxTrees[0].Options,
-                                                   generatorInstances,
-                                                   null!, // https://github.com/dotnet/roslyn/issues/46847
-                                                   ImmutableArray<AdditionalText>.Empty);
+            var driver = CSharpGeneratorDriver.Create(generatorInstances);
 
-            driver.RunFullGeneration(codeCompilation, out Compilation? outputCompilation, out ImmutableArray<Diagnostic> diagnostics);
+            driver.RunGeneratorsAndUpdateCompilation(codeCompilation, out Compilation? outputCompilation, out ImmutableArray<Diagnostic> diagnostics);
 
             errors = GetErrors("Error(s) running generator:", diagnostics, false);
             if (errors != null)

@@ -39,11 +39,11 @@ namespace DI
 }
 ";
 
-        public void Initialize(InitializationContext context)
+        public void Initialize(GeneratorInitializationContext context)
         {
         }
 
-        public void Execute(SourceGeneratorContext context)
+        public void Execute(GeneratorExecutionContext context)
         {
             Compilation? compilation = context.Compilation;
 
@@ -76,7 +76,7 @@ namespace DI
             GenerateServiceLocator(context, services);
         }
 
-        private static Compilation GenerateHelperClasses(SourceGeneratorContext context)
+        private static Compilation GenerateHelperClasses(GeneratorExecutionContext context)
         {
             var compilation = context.Compilation;
 
@@ -89,7 +89,7 @@ namespace DI
             return tempCompilation;
         }
 
-        private static void GenerateServiceLocator(SourceGeneratorContext context, List<Service> services)
+        private static void GenerateServiceLocator(GeneratorExecutionContext context, List<Service> services)
         {
             var sourceBuilder = new StringBuilder();
 
@@ -239,7 +239,7 @@ namespace DI
             return typeName;
         }
 
-        private static void CollectServices(SourceGeneratorContext context, INamedTypeSymbol typeToCreate, Compilation compilation, List<Service> services, KnownTypes knownTypes)
+        private static void CollectServices(GeneratorExecutionContext context, INamedTypeSymbol typeToCreate, Compilation compilation, List<Service> services, KnownTypes knownTypes)
         {
             typeToCreate = (INamedTypeSymbol)typeToCreate.WithNullableAnnotation(default);
 
