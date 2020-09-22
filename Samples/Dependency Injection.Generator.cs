@@ -84,7 +84,7 @@ namespace DI
             var tempCompilation = compilation.AddSyntaxTrees(CSharpSyntaxTree.ParseText(SourceText.From(ServiceLocatorStub, Encoding.UTF8), options))
                                              .AddSyntaxTrees(CSharpSyntaxTree.ParseText(SourceText.From(TransientAttribute, Encoding.UTF8), options));
 
-            context.AddSource("TransientAttribute.cs", SourceText.From(TransientAttribute, Encoding.UTF8));
+            context.AddSource("TransientAttribute.cs", TransientAttribute);
 
             return tempCompilation;
         }
@@ -132,7 +132,7 @@ namespace DI
     }
 }");
 
-            context.AddSource("ServiceLocator.cs", SourceText.From(sourceBuilder.ToString(), Encoding.UTF8));
+            context.AddSource("ServiceLocator.cs", sourceBuilder.ToString());
         }
 
         private static void GenerateFields(StringBuilder sourceBuilder, List<Service> services, List<Service> fields, bool lazy)

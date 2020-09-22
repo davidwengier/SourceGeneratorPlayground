@@ -37,7 +37,7 @@ namespace AutoNotify
         public void Execute(GeneratorExecutionContext context)
         {
             // add the attribute text
-            context.AddSource("AutoNotifyAttribute", SourceText.From(attributeText, Encoding.UTF8));
+            context.AddSource("AutoNotifyAttribute", attributeText);
 
             // retreive the populated receiver 
             if (!(context.SyntaxReceiver is SyntaxReceiver receiver))
@@ -72,7 +72,7 @@ namespace AutoNotify
             foreach (IGrouping<INamedTypeSymbol, IFieldSymbol> group in fieldSymbols.GroupBy(f => f.ContainingType))
             {
                 string classSource = ProcessClass(group.Key, group.ToList(), attributeSymbol, notifySymbol, context);
-                context.AddSource($"{group.Key.Name}_autoNotify.cs", SourceText.From(classSource, Encoding.UTF8));
+                context.AddSource($"{group.Key.Name}_autoNotify.cs", classSource);
             }
         }
 
