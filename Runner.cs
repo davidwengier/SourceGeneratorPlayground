@@ -159,9 +159,9 @@ namespace SourceGeneratorPlayground
                 return;
             }
 
+            using var writer = new StringWriter();
             try
             {
-                using var writer = new StringWriter();
                 Console.SetOut(writer);
 
                 int paramCount = main.GetParameters().Length;
@@ -188,7 +188,7 @@ namespace SourceGeneratorPlayground
             }
             catch (Exception ex)
             {
-                this.ErrorText = "Error executing program:" + Environment.NewLine + Environment.NewLine + ex.ToString();
+                this.ErrorText = writer.ToString() + "\n\nError executing program:" + Environment.NewLine + Environment.NewLine + ex.ToString();
                 return;
             }
         }
