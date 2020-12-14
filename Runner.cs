@@ -14,7 +14,7 @@ using Microsoft.CodeAnalysis.CSharp;
 
 namespace SourceGeneratorPlayground
 {
-    internal class Runner
+    public class Runner
     {
         private static List<MetadataReference>? s_references;
 
@@ -227,21 +227,57 @@ namespace SourceGeneratorPlayground
             return header + Environment.NewLine + Environment.NewLine + string.Join(Environment.NewLine, errors);
         }
 
-        private static async Task<List<MetadataReference>> GetReferences(string baseUri)
+        private async Task<List<MetadataReference>> GetReferences(string baseUri)
         {
             Assembly[]? refs = AppDomain.CurrentDomain.GetAssemblies();
-            var client = new HttpClient
+            using var client = new HttpClient
             {
                 BaseAddress = new Uri(baseUri)
             };
 
             var references = new List<MetadataReference>();
-
-            foreach (Assembly? reference in refs.Where(x => !x.IsDynamic && !string.IsNullOrWhiteSpace(x.Location)))
+            try
             {
-                Stream? stream = await client.GetStreamAsync($"_framework/_bin/{reference.Location}");
-                references.Add(MetadataReference.CreateFromStream(stream));
 
+                foreach (Assembly reference in refs.Where(x => !x.IsDynamic))// && (!string.IsNullOrWhiteSpace(x.Location) || !string.IsNullOrWhiteSpace(x.CodeBase))))
+                {
+                    string path;
+                    if (string.IsNullOrWhiteSpace(reference.Location))
+                    {
+                        //MetadataReference.CreateFromFile(reference.Location);
+                        //MetadataReference.CreateFromImage(reference.)
+                        try
+                        {
+                            //var uri = new Uri(reference.EscapedCodeBase);
+                            //path = uri.LocalPath.Substring(1);
+                            path = reference.GetName().Name!;
+                            //references.Add(MetadataReference.Crea($"{baseUri}/_framework/{path}"));
+                        }
+                        catch (Exception e)
+                        {
+                            var str = e.ToString();
+
+                            throw;
+                        }
+                    }
+                    else
+                    {
+                        path = reference.Location;
+                        //references.Add(MetadataReference.CreateFromFile(reference.Location));
+                    }
+                    //if (System.Diagnostics.Debugger.IsAttached)
+                    //{
+                    //    System.Diagnostics.Debugger.Log(1, "LOL", $"path: {path}");
+                    //}
+                    //Console.WriteLine($"path: {path}");
+                    Stream? stream = await client.GetStreamAsync($"_framework/{path}.dll");
+                    references.Add(MetadataReference.CreateFromStream(stream));
+
+                }
+            } catch (Exception e)
+            {
+                var str = e.ToString();
+                throw;
             }
 
             return references;

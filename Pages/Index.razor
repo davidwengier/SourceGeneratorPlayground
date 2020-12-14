@@ -1,33 +1,38 @@
 ﻿@page "/"
 @inject NavigationManager navigationManager
-@using BlazorInputFile
 @using System.Threading
 
-<div class="banner">
-    <span class="title">Source Generator Playground<span class="version"> - @ThisAssembly.AssemblyInformationalVersion</span></span>
-    Load sample: <select value="@_currentSample" @onchange="LoadSample">
-        @{
-            var index = 0;
-        }
-        @foreach (string sample in SamplesLoader.Samples)
-        {
-            <option value="@(index++)">@sample</option>
-        }
-    </select>
-    <span class="about">
-        by <a target="_blank" href="https://twitter.com/davidwengier">@@davidwengier</a>
-        - <a target="_blank" href="https://github.com/davidwengier/SourceGeneratorPlayground">GitHub</a>
-    </span>
-</div>
+<div class="banner top-row px-4">
+        <span class="title">Source Generator Playground<span class="version"> - @ThisAssembly.AssemblyInformationalVersion</span></span>
+        Load sample: <select value="@_currentSample" @onchange="LoadSample">
+            @{
+                var index = 0;
+            }
+            @foreach (string sample in SamplesLoader.Samples)
+            {
+                <option value="@(index++)">@sample</option>
+            }
+        </select>
+        <span class="about">
+            by <a target="_blank" href="https://twitter.com/davidwengier">@@davidwengier</a>
+            - <a target="_blank" href="https://github.com/davidwengier/SourceGeneratorPlayground">GitHub</a>
+        </span>
+    </div>
+    @*<div class="top-row px-4">
+        <a href="http://blazor.net" target="_blank" class="ml-md-auto">About</a>
+    </div>*@
 
-<div class="parent">
+    @*<div class="content px-4"> </div>*@
+
+<div class="content parent px-4">
     <div class="code-header"><span class="header">Program Code</span><div class="fileUpload btn btn-secondary"><span>Load</span><InputFile OnChange="HandleCodeFileSelected" /></div></div>
     <div class="code"><MonacoEditor @ref="codeEditor" Id="code-editor" ConstructionOptions="EditorConstructionOptions" OnKeyUp="OnKeyUp" /></div>
     <div class="generator-header"><span class="header">Source Generator</span><div class="fileUpload btn btn-secondary"><span>Load</span><InputFile OnChange="HandleGeneratorFileSelected" /></div></div>
     <div class="generator"><MonacoEditor @ref="generator" Id="generator" ConstructionOptions="EditorConstructionOptions" OnKeyUp="OnKeyUp" /></div>
     <div class="program-output-header"><span class="header">Output</span></div>
     <div class="program-output"><MonacoEditor @ref="programOutput" Id="program-output" ConstructionOptions="EditorConstructionOptions" /></div>
-    <div class="generator-output-header"><span class="header">Generated Output</span>
+    <div class="generator-output-header">
+        <span class="header">Generated Output</span>
         <div class="refresh">
             <span>
                 <input type="checkbox" @bind="_autoRefresh" /> Auto
@@ -97,7 +102,7 @@
         {
             options.Value = gen;
 
-        _ = Update(default);
+            _ = Update(default);
         }
 
 
@@ -158,19 +163,19 @@
         await generatorOutput.SetValue(runner.GeneratorOutput);
     }
 
-    private async Task HandleCodeFileSelected(IFileListEntry[] files)
+    private async Task HandleCodeFileSelected(InputFileChangeEventArgs args)
     {
-        await LoadFile(files[0], codeEditor);
+        await LoadFile(args.File, codeEditor);
     }
 
-    private async Task HandleGeneratorFileSelected(IFileListEntry[] files)
+    private async Task HandleGeneratorFileSelected(InputFileChangeEventArgs args)
     {
-        await LoadFile(files[0], generator);
+        await LoadFile(args.File, generator);
     }
 
-    private async Task LoadFile(IFileListEntry file, MonacoEditor editor)
+    private async Task LoadFile(IBrowserFile file, MonacoEditor editor)
     {
-        using (var reader = new System.IO.StreamReader(file.Data))
+        using (var reader = new System.IO.StreamReader(file.OpenReadStream()))
         {
             await editor.SetValue(await reader.ReadToEndAsync());
         }
