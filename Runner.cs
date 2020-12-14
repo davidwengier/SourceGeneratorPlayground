@@ -6,6 +6,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Reflection;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -35,7 +36,8 @@ namespace SourceGeneratorPlayground
         {
             if (s_references == null)
             {
-                s_references = await GetReferences(baseUri);
+                //s_references = await GetReferences(baseUri);
+                s_references = await GetReferencesFromBootDoc(baseUri);
             }
 
             this.ProgramOutput = "";
@@ -235,6 +237,11 @@ namespace SourceGeneratorPlayground
                 BaseAddress = new Uri(baseUri)
             };
 
+            using var bootResponse = await client.GetAsync("_framework/blazor.boot.json");
+            bootResponse.EnsureSuccessStatusCode();
+            using var boot = JsonDocument.Parse(await bootResponse.Content.ReadAsStringAsync());
+            var assemblies = boot.RootElement.GetProperty("resources").GetProperty("assembly").EnumerateObject().Select(jp => jp.Name);
+
             var references = new List<MetadataReference>();
             try
             {
@@ -274,6 +281,45 @@ namespace SourceGeneratorPlayground
                     references.Add(MetadataReference.CreateFromStream(stream));
 
                 }
+            } catch (Exception e)
+            {
+                var str = e.ToString();
+                throw;
+            }
+
+            return references;
+        }
+
+        private async Task<List<MetadataReference>> GetReferencesFromBootDoc(string baseUri)
+        {
+            Assembly[]? refs = AppDomain.CurrentDomain.GetAssemblies();
+            using var client = new HttpClient
+            {
+                BaseAddress = new Uri(baseUri)
+            };
+
+            var references = new List<MetadataReference>();
+            try
+            {
+            using var bootResponse = await client.GetAsync("_framework/blazor.boot.json");
+            bootResponse.EnsureSuccessStatusCode();
+            using var boot = JsonDocument.Parse(await bootResponse.Content.ReadAsStringAsync());
+            var assemblies = boot.RootElement.GetProperty("resources").GetProperty("assembly").EnumerateObject().Select(jp => jp.Name);
+                //.Concat(boot.RootElement.GetProperty("resources").GetProperty("lazyAssembly").EnumerateObject().Select(jp => jp.Name));
+
+            try
+            {
+                foreach (var assemblyName in assemblies)
+                {
+                    Stream? stream = await client.GetStreamAsync($"_framework/{assemblyName}");
+                    references.Add(MetadataReference.CreateFromStream(stream));
+
+                }
+            } catch (Exception e)
+            {
+                var str = e.ToString();
+                throw;
+            }
             } catch (Exception e)
             {
                 var str = e.ToString();

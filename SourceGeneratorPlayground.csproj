@@ -4,9 +4,9 @@
     <TargetFramework>net5.0</TargetFramework>
     <!--<LangVersion>preview</LangVersion>-->
     <!--<BlazorWebAssemblyEnableLinking>false</BlazorWebAssemblyEnableLinking>-->
-    <PublishSingleFile>false</PublishSingleFile>
+    <!--<PublishSingleFile>false</PublishSingleFile>-->
     <PublishTrimmed>false</PublishTrimmed>
-    <PublishReadyToRun>false</PublishReadyToRun>
+    <!--<PublishReadyToRun>false</PublishReadyToRun>-->
   </PropertyGroup>
 
   <ItemGroup>
