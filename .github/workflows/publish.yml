@@ -1,7 +1,4 @@
 name: DeployToGitHubPages
-env:
-  PUBLISH_DIR: bin/Release/netstandard2.1/publish/wwwroot
-  # Include subfolders if needed
 
 on:
   push:
@@ -17,13 +14,12 @@ jobs:
         
     - name: Publish app
       run: dotnet publish -c Release
-      # You can use cd before if your project is in a subfolder
 
     - name: GitHub Pages
       if: success()
       uses: crazy-max/ghaction-github-pages@v2.2.0
       with:
         target_branch: gh-pages
-        build_dir: ${{ env.PUBLISH_DIR }}
+        build_dir: bin/Release/netstandard2.1/publish/wwwroot
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
