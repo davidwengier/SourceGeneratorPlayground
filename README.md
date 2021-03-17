@@ -1,7 +1,7 @@
 # !["bulb by Luca Ska from the Noun Project"](assets/bulb.png) sourcegen.dev - The Source Generator Playground
 
 [![License: MIT](https://img.shields.io/github/license/davidwengier/SourceGeneratorPlayground?color=blue "License: MIT")](https://choosealicense.com/licenses/mit/)
-[![Main build status](https://github.com/davidwengier/SourceGeneratorPlayground/workflows/main/badge.svg "Main build status")](https://github.com/davidwengier/SourceGeneratorPlayground/actions?query=workflow%3AMain)
+[![Main build status](https://github.com/davidwengier/SourceGeneratorPlayground/workflows/DeployToGitHubPages/badge.svg "Build status")](https://github.com/davidwengier/SourceGeneratorPlayground/actions?query=workflow%3ADeployToGitHubPages)
 [![Join the Discord](https://img.shields.io/discord/709643112636612658?label=Discord "Join the Discord")](https://discord.gg/Yt5B58b)
 
 Source Generator Playground is a simple Blazor app that lets you experiment with a C# 9 source generator. It allows you to write a simple console application, and a source generator, and observe the generated output and the program output.
