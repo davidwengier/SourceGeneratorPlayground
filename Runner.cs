@@ -8,6 +8,7 @@ using System.Net.Http;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Components;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 
@@ -15,44 +16,36 @@ using Microsoft.CodeAnalysis.CSharp;
 
 namespace SourceGeneratorPlayground
 {
-    internal class Runner
+    internal class Runner : IRunner
     {
         private static List<MetadataReference>? s_references;
 
-        private readonly string _code;
-        private readonly string _generator;
+        private readonly string _baseUri;
 
         public string ErrorText { get; private set; } = "";
         public string? GeneratorOutput { get; private set; } = "";
         public string ProgramOutput { get; private set; } = "";
 
-        public Runner(string code, string generator)
+        public Runner(NavigationManager navigationManager)
         {
-            _code = code;
-            _generator = generator;
+            _baseUri = navigationManager.BaseUri;
         }
 
-        internal async Task Run(string baseUri)
+        public async Task RunAsync(string code, string generator)
         {
-            s_references ??= await GetReferences(baseUri);
+            s_references ??= await GetReferences(_baseUri);
 
             this.ProgramOutput = "";
             this.GeneratorOutput = "";
             this.ErrorText = "";
 
-            if (string.IsNullOrWhiteSpace(_code) || string.IsNullOrWhiteSpace(_generator))
-            {
-                this.ErrorText = "Need more input!";
-                return;
-            }
-
-            if (!TryCompileGenerator(_generator, out var errorCompilingGenerator, out var generatorInstances))
+            if (!TryCompileGenerator(generator, out var errorCompilingGenerator, out var generatorInstances))
             {
                 this.ErrorText = errorCompilingGenerator;
                 return;
             }
 
-            if (!TryCompileUserCode(_code, generatorInstances, out var errorCompilingUserCode, out var programAssembly, out var generatorOutput))
+            if (!TryCompileUserCode(code, generatorInstances, out var errorCompilingUserCode, out var programAssembly, out var generatorOutput))
             {
                 this.ErrorText = errorCompilingUserCode;
                 this.GeneratorOutput = generatorOutput;
@@ -74,6 +67,12 @@ namespace SourceGeneratorPlayground
         {
             error = default;
             generators = default;
+
+            if (string.IsNullOrWhiteSpace(code))
+            {
+                error = "Need more input for the generator code!";
+                return false;
+            }
 
             var generatorTree = CSharpSyntaxTree.ParseText(code, new CSharpParseOptions(kind: SourceCodeKind.Regular), "Generator.cs");
 
@@ -118,6 +117,13 @@ namespace SourceGeneratorPlayground
             error = default;
             programAssembly = default;
             generatorOutput = default;
+
+            if (string.IsNullOrWhiteSpace(code))
+            {
+                error = "Need more input for the user code!";
+                return false;
+            }
+
             var codeTree = CSharpSyntaxTree.ParseText(code, new CSharpParseOptions(kind: SourceCodeKind.Regular), "Program.cs");
             var codeCompilation = CSharpCompilation.Create("Program", new SyntaxTree[] { codeTree }, s_references, new CSharpCompilationOptions(OutputKind.ConsoleApplication));
 

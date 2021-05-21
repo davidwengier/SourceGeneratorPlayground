@@ -1,5 +1,5 @@
 ﻿@page "/"
-@inject NavigationManager navigationManager
+@inject IRunner Runner 
 @using BlazorInputFile
 @using System.Threading
 
@@ -143,19 +143,17 @@
             return;
         }
 
-        var runner = new Runner(await codeEditor.GetValue(), await generator.GetValue());
+        await Runner.RunAsync(await codeEditor.GetValue(), await generator.GetValue());
 
-        await runner.Run(navigationManager.BaseUri);
-
-        if (runner.ErrorText?.Length != 0)
+        if (Runner.ErrorText?.Length != 0)
         {
-            await programOutput.SetValue(runner.ErrorText);
+            await programOutput.SetValue(Runner.ErrorText);
         }
         else
         {
-            await programOutput.SetValue(runner.ProgramOutput);
+            await programOutput.SetValue(Runner.ProgramOutput);
         }
-        await generatorOutput.SetValue(runner.GeneratorOutput);
+        await generatorOutput.SetValue(Runner.GeneratorOutput);
     }
 
     private async Task HandleCodeFileSelected(IFileListEntry[] files)
