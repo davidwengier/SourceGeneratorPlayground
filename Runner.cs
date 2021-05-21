@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using MonoTouch.Dialog.Utilities;
 
 #nullable enable
 
@@ -20,6 +21,8 @@ namespace SourceGeneratorPlayground
     internal class Runner : IRunner
     {
         private static List<MetadataReference>? s_references;
+
+        private static readonly LRUCache<string, ImmutableArray<ISourceGenerator>> s_sourceGeneratorCache = new(entryLimit: 10);
 
         private readonly string _baseUri;
 
@@ -80,6 +83,14 @@ namespace SourceGeneratorPlayground
                 return false;
             }
 
+            var normalizedCode = CSharpSyntaxTree.ParseText(code).GetRoot().NormalizeWhitespace().ToFullString();
+            var cacheHit = s_sourceGeneratorCache[normalizedCode];
+            if (cacheHit != null)
+            {
+                generators = cacheHit;
+                return true;
+            }
+
             var generatorTree = CSharpSyntaxTree.ParseText(code, new CSharpParseOptions(kind: SourceCodeKind.Regular), "Generator.cs", cancellationToken: cancellationToken);
 
             var generatorCompilation = CSharpCompilation.Create("Generator", new[] { generatorTree }, s_references, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
@@ -115,6 +126,7 @@ namespace SourceGeneratorPlayground
                 return false;
             }
 
+            s_sourceGeneratorCache[normalizedCode] = generators;
             return true;
         }
 
