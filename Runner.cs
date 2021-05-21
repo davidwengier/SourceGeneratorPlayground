@@ -7,6 +7,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Reflection;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components;
 using Microsoft.CodeAnalysis;
@@ -31,7 +32,7 @@ namespace SourceGeneratorPlayground
             _baseUri = navigationManager.BaseUri;
         }
 
-        public async Task RunAsync(string code, string generator)
+        public async Task RunAsync(string code, string generator, CancellationToken cancellationToken)
         {
             s_references ??= await GetReferences(_baseUri);
 
@@ -39,13 +40,13 @@ namespace SourceGeneratorPlayground
             this.GeneratorOutput = "";
             this.ErrorText = "";
 
-            if (!TryCompileGenerator(generator, out var errorCompilingGenerator, out var generatorInstances))
+            if (!TryCompileGenerator(generator, out var errorCompilingGenerator, out var generatorInstances, cancellationToken))
             {
                 this.ErrorText = errorCompilingGenerator;
                 return;
             }
 
-            if (!TryCompileUserCode(code, generatorInstances, out var errorCompilingUserCode, out var programAssembly, out var generatorOutput))
+            if (!TryCompileUserCode(code, generatorInstances, out var errorCompilingUserCode, out var programAssembly, out var generatorOutput, cancellationToken))
             {
                 this.ErrorText = errorCompilingUserCode;
                 this.GeneratorOutput = generatorOutput;
@@ -53,7 +54,7 @@ namespace SourceGeneratorPlayground
             }
 
             this.GeneratorOutput = generatorOutput;
-            if (!TryExecuteProgram(programAssembly, out var errorExecution, out var output))
+            if (!TryExecuteProgram(programAssembly, out var errorExecution, out var output, cancellationToken))
             {
                 this.ErrorText = errorExecution;
             }
@@ -63,7 +64,11 @@ namespace SourceGeneratorPlayground
             }
         }
 
-        private static bool TryCompileGenerator(string code, [NotNullWhen(false)] out string? error, [NotNullWhen(true)] out ImmutableArray<ISourceGenerator> generators)
+        private static bool TryCompileGenerator(
+            string code, 
+            [NotNullWhen(false)] out string? error, 
+            [NotNullWhen(true)] out ImmutableArray<ISourceGenerator> generators, 
+            CancellationToken cancellationToken)
         {
             error = default;
             generators = default;
@@ -74,17 +79,17 @@ namespace SourceGeneratorPlayground
                 return false;
             }
 
-            var generatorTree = CSharpSyntaxTree.ParseText(code, new CSharpParseOptions(kind: SourceCodeKind.Regular), "Generator.cs");
+            var generatorTree = CSharpSyntaxTree.ParseText(code, new CSharpParseOptions(kind: SourceCodeKind.Regular), "Generator.cs", cancellationToken: cancellationToken);
 
             var generatorCompilation = CSharpCompilation.Create("Generator", new[] { generatorTree }, s_references, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
-            error = GetErrors("Error(s) compiling generator:", generatorCompilation.GetDiagnostics());
+            error = GetErrors("Error(s) compiling generator:", generatorCompilation.GetDiagnostics(cancellationToken: cancellationToken));
             if (error != null)
             {
                 return false;
             }
 
-            var generatorAssembly = GetAssembly(generatorCompilation, "generator", out error);
+            var generatorAssembly = GetAssembly(generatorCompilation, "generator", out error, cancellationToken: cancellationToken);
             if (error != null)
             {
                 return false;
@@ -112,7 +117,12 @@ namespace SourceGeneratorPlayground
             return true;
         }
 
-        private static bool TryCompileUserCode(string code, ImmutableArray<ISourceGenerator> generators, [NotNullWhen(false)] out string? error, [NotNullWhen(true)] out Assembly? programAssembly, out string? generatorOutput)
+        private static bool TryCompileUserCode
+            (string code, 
+            ImmutableArray<ISourceGenerator> generators, 
+            [NotNullWhen(false)] out string? error,
+            [NotNullWhen(true)] out Assembly? programAssembly, 
+            out string? generatorOutput, CancellationToken cancellationToken)
         {
             error = default;
             programAssembly = default;
@@ -124,12 +134,12 @@ namespace SourceGeneratorPlayground
                 return false;
             }
 
-            var codeTree = CSharpSyntaxTree.ParseText(code, new CSharpParseOptions(kind: SourceCodeKind.Regular), "Program.cs");
+            var codeTree = CSharpSyntaxTree.ParseText(code, new CSharpParseOptions(kind: SourceCodeKind.Regular), "Program.cs", cancellationToken: cancellationToken);
             var codeCompilation = CSharpCompilation.Create("Program", new SyntaxTree[] { codeTree }, s_references, new CSharpCompilationOptions(OutputKind.ConsoleApplication));
 
             var driver = CSharpGeneratorDriver.Create(generators);
 
-            driver.RunGeneratorsAndUpdateCompilation(codeCompilation, out Compilation? outputCompilation, out ImmutableArray<Diagnostic> diagnostics);
+            driver.RunGeneratorsAndUpdateCompilation(codeCompilation, out Compilation? outputCompilation, out ImmutableArray<Diagnostic> diagnostics, cancellationToken: cancellationToken);
 
             error = GetErrors("Error(s) running generator:", diagnostics, false);
             if (error != null)
@@ -152,7 +162,7 @@ namespace SourceGeneratorPlayground
                     output.AppendLine(new string('-', 50));
                 }
 
-                output.AppendLine(tree.WithRootAndOptions(tree.GetRoot().NormalizeWhitespace(), tree.Options).ToString());
+                output.AppendLine(tree.WithRootAndOptions(tree.GetRoot(cancellationToken: cancellationToken).NormalizeWhitespace(), tree.Options).ToString());
             }
             if (output.Length == 0)
             {
@@ -160,13 +170,13 @@ namespace SourceGeneratorPlayground
             }
             generatorOutput = output.ToString();
 
-            error = GetErrors("Error(s) compiling program:", outputCompilation.GetDiagnostics());
+            error = GetErrors("Error(s) compiling program:", outputCompilation.GetDiagnostics(cancellationToken: cancellationToken));
             if (error != null)
             {
                 return false;
             }
 
-            programAssembly = GetAssembly(outputCompilation, "program", out error);
+            programAssembly = GetAssembly(outputCompilation, "program", out error, cancellationToken: cancellationToken);
             if (error != null)
             {
                 return false;
@@ -179,7 +189,11 @@ namespace SourceGeneratorPlayground
             return true;
         }
 
-        private static bool TryExecuteProgram(Assembly programAssembly, [NotNullWhen(false)] out string? error, [NotNullWhen(true)] out string? output)
+        private static bool TryExecuteProgram(
+            Assembly programAssembly, 
+            [NotNullWhen(false)] out string? error, 
+            [NotNullWhen(true)] out string? output, 
+            CancellationToken cancellationToken)
         {
             error = default;
             output = default;
@@ -232,12 +246,12 @@ namespace SourceGeneratorPlayground
             return true;
         }
 
-        private static Assembly? GetAssembly(Compilation generatorCompilation, string name, out string? errors)
+        private static Assembly? GetAssembly(Compilation generatorCompilation, string name, out string? errors, CancellationToken cancellationToken)
         {
             try
             {
                 using var generatorStream = new MemoryStream();
-                var result = generatorCompilation.Emit(generatorStream);
+                var result = generatorCompilation.Emit(generatorStream, cancellationToken: cancellationToken);
                 if (result == null)
                 {
                     errors = "Failed to compile with unknown error";

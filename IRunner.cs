@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+﻿using System.Threading;
+using System.Threading.Tasks;
 
 namespace SourceGeneratorPlayground
 {
@@ -8,6 +9,6 @@ namespace SourceGeneratorPlayground
         string GeneratorOutput { get; }
         string ProgramOutput { get; }
 
-        Task RunAsync(string code, string generator);
+        Task RunAsync(string code, string generator, CancellationToken cancellationToken);
     }
 }
