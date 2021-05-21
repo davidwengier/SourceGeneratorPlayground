@@ -54,9 +54,10 @@ namespace SourceGeneratorPlayground
             }
 
             this.GeneratorOutput = generatorOutput;
-            if (!TryExecuteProgram(programAssembly, out var errorExecution, out var output, cancellationToken))
+            var (success, output) = await TryExecuteProgramAsync(programAssembly);
+            if (!success)
             {
-                this.ErrorText = errorExecution;
+                this.ErrorText = output;
             }
             else
             {
@@ -189,26 +190,22 @@ namespace SourceGeneratorPlayground
             return true;
         }
 
-        private static bool TryExecuteProgram(
-            Assembly programAssembly, 
-            [NotNullWhen(false)] out string? error, 
-            [NotNullWhen(true)] out string? output, 
-            CancellationToken cancellationToken)
+        private static async Task<(bool Success, string Output)> TryExecuteProgramAsync(Assembly programAssembly)
         {
-            error = default;
-            output = default;
+            string? error = default;
+            string? output = default;
             var program = programAssembly.GetTypes().FirstOrDefault(t => t.Name == "Program");
             if (program == null)
             {
                 error = "Error executing program:" + Environment.NewLine + Environment.NewLine + "Could not find type \"Program\" in program.";
-                return false;
+                return (Success: false, Output: error);
             }
 
             var main = program.GetMethod("Main", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
             if (main == null)
             {
                 error = "Error executing program:" + Environment.NewLine + Environment.NewLine + "Could not find static method \"Main\" in program.";
-                return false;
+                return (Success: false, Output: error);
             }
 
             using var writer = new StringWriter();
@@ -217,18 +214,44 @@ namespace SourceGeneratorPlayground
                 Console.SetOut(writer);
 
                 int paramCount = main.GetParameters().Length;
-                if (paramCount == 1)
+                if (main.ReturnType == typeof(void))
                 {
-                    main.Invoke(null, new object?[] { null });
+                    if (paramCount == 1)
+                    {
+                        main.Invoke(null, new object?[] { null });
+                    }
+                    else if (paramCount == 0)
+                    {
+                        main.Invoke(null, null);
+                    }
+                    else
+                    {
+                        error = "Error executing program:" + Environment.NewLine + Environment.NewLine + "Method \"Main\" must have 0 or 1 parameters.";
+                        return (Success: false, Output: error);
+                    }
                 }
-                else if (paramCount == 0)
+                else if (main.ReturnType == typeof(Task))
                 {
-                    main.Invoke(null, null);
+                    if (paramCount == 1)
+                    {
+                        var task = main.Invoke(null, new object?[] { null }) as Task;
+                        await task!;
+                    }
+                    else if (paramCount == 0)
+                    {
+                        var task = main.Invoke(null, null) as Task;
+                        await task!;
+                    }
+                    else
+                    {
+                        error = "Error executing program:" + Environment.NewLine + Environment.NewLine + "Method \"Main\" must have 0 or 1 parameters.";
+                        return (Success: false, Output: error);
+                    }
                 }
                 else
                 {
-                    error = "Error executing program:" + Environment.NewLine + Environment.NewLine + "Method \"Main\" must have 0 or 1 parameters.";
-                    return false;
+                    error = "Error executing program:" + Environment.NewLine + Environment.NewLine + "Method \"Main\" must have either void or Task return type.";
+                    return (Success: false, Output: error);
                 }
 
                 output = writer.ToString();
@@ -241,9 +264,9 @@ namespace SourceGeneratorPlayground
             catch (Exception ex)
             {
                 error = writer.ToString() + "\n\nError executing program:" + Environment.NewLine + Environment.NewLine + ex.ToString();
-                return false;
+                return (Success: false, Output: error);
             }
-            return true;
+            return (Success: true, Output: output);
         }
 
         private static Assembly? GetAssembly(Compilation generatorCompilation, string name, out string? errors, CancellationToken cancellationToken)
