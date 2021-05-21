@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -22,7 +23,7 @@ namespace SourceGeneratorPlayground
         private readonly string _generator;
 
         public string ErrorText { get; private set; } = "";
-        public string GeneratorOutput { get; private set; } = "";
+        public string? GeneratorOutput { get; private set; } = "";
         public string ProgramOutput { get; private set; } = "";
 
         public Runner(string code, string generator)
@@ -33,10 +34,7 @@ namespace SourceGeneratorPlayground
 
         internal async Task Run(string baseUri)
         {
-            if (s_references == null)
-            {
-                s_references = await GetReferences(baseUri);
-            }
+            s_references ??= await GetReferences(baseUri);
 
             this.ProgramOutput = "";
             this.GeneratorOutput = "";
@@ -48,59 +46,94 @@ namespace SourceGeneratorPlayground
                 return;
             }
 
-            SyntaxTree? generatorTree = CSharpSyntaxTree.ParseText(_generator, new CSharpParseOptions(kind: SourceCodeKind.Regular), "Generator.cs");
+            if (!TryCompileGenerator(_generator, out var errorCompilingGenerator, out var generatorInstances))
+            {
+                this.ErrorText = errorCompilingGenerator;
+                return;
+            }
+
+            if (!TryCompileUserCode(_code, generatorInstances, out var errorCompilingUserCode, out var programAssembly, out var generatorOutput))
+            {
+                this.ErrorText = errorCompilingUserCode;
+                this.GeneratorOutput = generatorOutput;
+                return;
+            }
+
+            this.GeneratorOutput = generatorOutput;
+            if (!TryExecuteProgram(programAssembly, out var errorExecution, out var output))
+            {
+                this.ErrorText = errorExecution;
+            }
+            else
+            {
+                this.ProgramOutput = output;
+            }
+        }
+
+        private static bool TryCompileGenerator(string code, [NotNullWhen(false)] out string? error, [NotNullWhen(true)] out ImmutableArray<ISourceGenerator> generators)
+        {
+            error = default;
+            generators = default;
+
+            var generatorTree = CSharpSyntaxTree.ParseText(code, new CSharpParseOptions(kind: SourceCodeKind.Regular), "Generator.cs");
 
             var generatorCompilation = CSharpCompilation.Create("Generator", new[] { generatorTree }, s_references, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
-            string? errors = GetErrors("Error(s) compiling generator:", generatorCompilation.GetDiagnostics());
-            if (errors != null)
+            error = GetErrors("Error(s) compiling generator:", generatorCompilation.GetDiagnostics());
+            if (error != null)
             {
-                this.ErrorText = errors;
-                return;
+                return false;
             }
 
-            Assembly? generatorAssembly = GetAssembly(generatorCompilation, "generator", out errors);
-            if (errors != null)
+            var generatorAssembly = GetAssembly(generatorCompilation, "generator", out error);
+            if (error != null)
             {
-                this.ErrorText = errors;
-                return;
+                return false;
             }
             if (generatorAssembly == null)
             {
-                this.ErrorText = "Unknown error emitting generator.";
-                return;
+                error = "Unknown error emitting generator.";
+                return false;
             }
 
-            var generatorInstances = generatorAssembly.GetTypes()
+
+            generators = generatorAssembly.GetTypes()
                 .Where(t => !t.GetTypeInfo().IsInterface && !t.GetTypeInfo().IsAbstract && !t.GetTypeInfo().ContainsGenericParameters)
                 .Where(t => typeof(ISourceGenerator).IsAssignableFrom(t))
                 .Select(t => Activator.CreateInstance(t))
                 .OfType<ISourceGenerator>()
                 .ToImmutableArray();
 
-            if (generatorInstances.Length == 0)
+            if (generators.Length == 0)
             {
-                this.ErrorText = "Could not instantiate source generator. Types in assembly:" + Environment.NewLine + Environment.NewLine + string.Join(Environment.NewLine, (object)generatorAssembly.GetTypes());
-                return;
+                error = "Could not instantiate source generator. Types in assembly:" + Environment.NewLine + Environment.NewLine + string.Join(Environment.NewLine, (object)generatorAssembly.GetTypes());
+                return false;
             }
 
-            SyntaxTree? codeTree = CSharpSyntaxTree.ParseText(_code, new CSharpParseOptions(kind: SourceCodeKind.Regular), "Program.cs");
+            return true;
+        }
+
+        private static bool TryCompileUserCode(string code, ImmutableArray<ISourceGenerator> generators, [NotNullWhen(false)] out string? error, [NotNullWhen(true)] out Assembly? programAssembly, out string? generatorOutput)
+        {
+            error = default;
+            programAssembly = default;
+            generatorOutput = default;
+            var codeTree = CSharpSyntaxTree.ParseText(code, new CSharpParseOptions(kind: SourceCodeKind.Regular), "Program.cs");
             var codeCompilation = CSharpCompilation.Create("Program", new SyntaxTree[] { codeTree }, s_references, new CSharpCompilationOptions(OutputKind.ConsoleApplication));
 
-            var driver = CSharpGeneratorDriver.Create(generatorInstances);
+            var driver = CSharpGeneratorDriver.Create(generators);
 
             driver.RunGeneratorsAndUpdateCompilation(codeCompilation, out Compilation? outputCompilation, out ImmutableArray<Diagnostic> diagnostics);
 
-            errors = GetErrors("Error(s) running generator:", diagnostics, false);
-            if (errors != null)
+            error = GetErrors("Error(s) running generator:", diagnostics, false);
+            if (error != null)
             {
-                this.ErrorText = errors;
-                return;
+                return false;
             }
 
             var output = new StringBuilder();
-            SyntaxTree[]? trees = outputCompilation.SyntaxTrees.Where(t => t != codeTree).OrderBy(t => t.FilePath).ToArray();
-            foreach (SyntaxTree? tree in trees)
+            var trees = outputCompilation.SyntaxTrees.Where(t => t != codeTree).OrderBy(t => t.FilePath).ToArray();
+            foreach (var tree in trees)
             {
                 if (output.Length > 0)
                 {
@@ -119,44 +152,43 @@ namespace SourceGeneratorPlayground
             {
                 output.AppendLine("< No source generated >");
             }
-            this.GeneratorOutput = output.ToString();
+            generatorOutput = output.ToString();
 
-            errors = GetErrors("Error(s) compiling program:", outputCompilation.GetDiagnostics());
-            if (errors != null)
+            error = GetErrors("Error(s) compiling program:", outputCompilation.GetDiagnostics());
+            if (error != null)
             {
-                this.ErrorText = errors;
-                return;
+                return false;
             }
 
-            Assembly? programAssembly = GetAssembly(outputCompilation, "program", out errors);
-            if (errors != null)
+            programAssembly = GetAssembly(outputCompilation, "program", out error);
+            if (error != null)
             {
-                this.ErrorText = errors;
-                return;
+                return false;
             }
             if (programAssembly == null)
             {
-                this.ErrorText = "Unknown error emitting program.";
-                return;
+                error = "Unknown error emitting program.";
+                return false;
             }
-
-            ExecuteProgram(programAssembly);
+            return true;
         }
 
-        private void ExecuteProgram(Assembly programAssembly)
+        private static bool TryExecuteProgram(Assembly programAssembly, [NotNullWhen(false)] out string? error, [NotNullWhen(true)] out string? output)
         {
-            Type? program = programAssembly.GetTypes().FirstOrDefault(t => t.Name == "Program");
+            error = default;
+            output = default;
+            var program = programAssembly.GetTypes().FirstOrDefault(t => t.Name == "Program");
             if (program == null)
             {
-                this.ErrorText = "Error executing program:" + Environment.NewLine + Environment.NewLine + "Could not find type \"Program\" in program.";
-                return;
+                error = "Error executing program:" + Environment.NewLine + Environment.NewLine + "Could not find type \"Program\" in program.";
+                return false;
             }
 
-            MethodInfo? main = program.GetMethod("Main", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+            var main = program.GetMethod("Main", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
             if (main == null)
             {
-                this.ErrorText = "Error executing program:" + Environment.NewLine + Environment.NewLine + "Could not find static method \"Main\" in program.";
-                return;
+                error = "Error executing program:" + Environment.NewLine + Environment.NewLine + "Could not find static method \"Main\" in program.";
+                return false;
             }
 
             using var writer = new StringWriter();
@@ -175,30 +207,36 @@ namespace SourceGeneratorPlayground
                 }
                 else
                 {
-                    this.ErrorText = "Error executing program:" + Environment.NewLine + Environment.NewLine + "Method \"Main\" must have 0 or 1 parameters.";
-                    return;
+                    error = "Error executing program:" + Environment.NewLine + Environment.NewLine + "Method \"Main\" must have 0 or 1 parameters.";
+                    return false;
                 }
 
-                this.ProgramOutput = writer.ToString();
+                output = writer.ToString();
 
-                if (string.IsNullOrEmpty(this.ProgramOutput))
+                if (string.IsNullOrEmpty(output))
                 {
-                    this.ProgramOutput = "< No program output >";
+                    output = "< No program output >";
                 }
             }
             catch (Exception ex)
             {
-                this.ErrorText = writer.ToString() + "\n\nError executing program:" + Environment.NewLine + Environment.NewLine + ex.ToString();
-                return;
+                error = writer.ToString() + "\n\nError executing program:" + Environment.NewLine + Environment.NewLine + ex.ToString();
+                return false;
             }
+            return true;
         }
 
-        private Assembly? GetAssembly(Compilation generatorCompilation, string name, out string? errors)
+        private static Assembly? GetAssembly(Compilation generatorCompilation, string name, out string? errors)
         {
             try
             {
                 using var generatorStream = new MemoryStream();
-                Microsoft.CodeAnalysis.Emit.EmitResult? result = generatorCompilation.Emit(generatorStream);
+                var result = generatorCompilation.Emit(generatorStream);
+                if (result == null)
+                {
+                    errors = "Failed to compile with unknown error";
+                    return null;
+                }
                 if (!result.Success)
                 {
                     errors = GetErrors($"Error emitting {name}:", result.Diagnostics, false);
