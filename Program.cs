@@ -14,7 +14,6 @@ namespace SourceGeneratorPlayground
             builder.RootComponents.Add<App>("app");
 
             builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) });
-            builder.Services.AddScoped<IRunner, Runner>();
 
             await builder.Build().RunAsync();
         }
